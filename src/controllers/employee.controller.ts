@@ -1,5 +1,6 @@
-const employeeService = require('../services/employee.service');
-const EmployeeMapper = require('../dto/mapper/employee.mapper');
+import { Request, Response } from 'express';
+import employeeService from '../services/employee.service';
+import { EmployeeMapper } from '../dto/mapper/employee.mapper';
 
 class EmployeeController {
   /**
@@ -34,7 +35,7 @@ class EmployeeController {
    *       500:
    *         description: Server error
    */
-  async getAllEmployees(req, res) {
+  async getAllEmployees(_req: Request, res: Response): Promise<void> {
     try {
       const employees = await employeeService.getAllEmployees();
       const employeeDtos = EmployeeMapper.toResponseDtoArray(employees);
@@ -45,7 +46,7 @@ class EmployeeController {
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -96,19 +97,20 @@ class EmployeeController {
    *       404:
    *         description: Employee not found
    */
-  async getEmployeeById(req, res) {
+  async getEmployeeById(req: Request, res: Response): Promise<void> {
     try {
-      const employee = await employeeService.getEmployeeById(req.params.id);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const employee = await employeeService.getEmployeeById(id!);
       const employeeDto = EmployeeMapper.toDetailResponseDto(employee);
       res.status(200).json({
         success: true,
         data: employeeDto,
       });
     } catch (error) {
-      const statusCode = error.message === 'Employee not found' ? 404 : 500;
+      const statusCode = error instanceof Error && error.message === 'Employee not found' ? 404 : 500;
       res.status(statusCode).json({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -158,7 +160,7 @@ class EmployeeController {
    *       400:
    *         description: Bad request - validation failed
    */
-  async createEmployee(req, res) {
+  async createEmployee(req: Request, res: Response): Promise<void> {
     try {
       const employee = await employeeService.createEmployee(req.body);
       const employeeDto = EmployeeMapper.toDetailResponseDto(employee);
@@ -167,13 +169,14 @@ class EmployeeController {
         data: employeeDto,
       });
     } catch (error) {
-      const statusCode = error.message.includes('required') ||
-                         error.message.includes('exists') ||
-                         error.message.includes('Invalid') ||
-                         error.message.includes('must be') ? 400 : 500;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = errorMessage.includes('required') ||
+                         errorMessage.includes('exists') ||
+                         errorMessage.includes('Invalid') ||
+                         errorMessage.includes('must be') ? 400 : 500;
       res.status(statusCode).json({
         success: false,
-        error: error.message,
+        error: errorMessage,
       });
     }
   }
@@ -218,23 +221,25 @@ class EmployeeController {
    *       400:
    *         description: Bad request - validation failed
    */
-  async updateEmployee(req, res) {
+  async updateEmployee(req: Request, res: Response): Promise<void> {
     try {
-      const employee = await employeeService.updateEmployee(req.params.id, req.body);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const employee = await employeeService.updateEmployee(id!, req.body);
       const employeeDto = EmployeeMapper.toDetailResponseDto(employee);
       res.status(200).json({
         success: true,
         data: employeeDto,
       });
     } catch (error) {
-      const statusCode = error.message === 'Employee not found' ? 404 :
-                         error.message.includes('exists') ||
-                         error.message.includes('Invalid') ||
-                         error.message.includes('must be') ||
-                         error.message.includes('No fields') ? 400 : 500;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = errorMessage === 'Employee not found' ? 404 :
+                         errorMessage.includes('exists') ||
+                         errorMessage.includes('Invalid') ||
+                         errorMessage.includes('must be') ||
+                         errorMessage.includes('No fields') ? 400 : 500;
       res.status(statusCode).json({
         success: false,
-        error: error.message,
+        error: errorMessage,
       });
     }
   }
@@ -257,18 +262,20 @@ class EmployeeController {
    *       404:
    *         description: Employee not found
    */
-  async deleteEmployee(req, res) {
+  async deleteEmployee(req: Request, res: Response): Promise<void> {
     try {
-      await employeeService.deleteEmployee(req.params.id);
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      await employeeService.deleteEmployee(id!);
       res.status(200).json({
         success: true,
         message: 'Employee deleted successfully',
       });
     } catch (error) {
-      const statusCode = error.message === 'Employee not found' ? 404 : 500;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = errorMessage === 'Employee not found' ? 404 : 500;
       res.status(statusCode).json({
         success: false,
-        error: error.message,
+        error: errorMessage,
       });
     }
   }
@@ -291,22 +298,24 @@ class EmployeeController {
    *       400:
    *         description: Department is required
    */
-  async getEmployeesByDepartment(req, res) {
+  async getEmployeesByDepartment(req: Request, res: Response): Promise<void> {
     try {
-      const employees = await employeeService.getEmployeesByDepartment(req.params.department);
+      const department = Array.isArray(req.params.department) ? req.params.department[0] : req.params.department;
+      const employees = await employeeService.getEmployeesByDepartment(department!);
       const employeeDtos = EmployeeMapper.toListResponseDtoArray(employees);
       res.status(200).json({
         success: true,
         data: employeeDtos,
       });
     } catch (error) {
-      const statusCode = error.message === 'Department is required' ? 400 : 500;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const statusCode = errorMessage === 'Department is required' ? 400 : 500;
       res.status(statusCode).json({
         success: false,
-        error: error.message,
+        error: errorMessage,
       });
     }
   }
 }
 
-module.exports = new EmployeeController();
+export default new EmployeeController();

@@ -1,8 +1,10 @@
-const express = require('express');
-const cors = require('cors');
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('./config/swagger');
-require('dotenv').config();
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './config/swagger';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
 
@@ -15,7 +17,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
-const apiRoutes = require('./routes');
+import apiRoutes from './routes';
 app.use('/api', apiRoutes);
 
 /**
@@ -37,19 +39,19 @@ app.use('/api', apiRoutes);
  *                 message:
  *                   type: string
  */
-app.get('/health', (req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
 // 404 handler
-app.use((req, res) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-module.exports = app;
+export default app;

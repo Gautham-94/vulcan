@@ -1,12 +1,13 @@
-const employeeRepository = require('../repositories/employee.repository');
-const { CreateEmployeeRequestDto, UpdateEmployeeRequestDto } = require('../dto/request/employee.request.dto');
+import { Employee } from '@prisma/client';
+import employeeRepository from '../repositories/employee.repository';
+import { CreateEmployeeRequestDto, UpdateEmployeeRequestDto } from '../dto/request/employee.request.dto';
 
 class EmployeeService {
-  async getAllEmployees() {
+  async getAllEmployees(): Promise<Employee[]> {
     return await employeeRepository.findAll();
   }
 
-  async getEmployeeById(id) {
+  async getEmployeeById(id: number | string): Promise<Employee> {
     const employee = await employeeRepository.findById(id);
 
     if (!employee) {
@@ -16,7 +17,7 @@ class EmployeeService {
     return employee;
   }
 
-  async createEmployee(data) {
+  async createEmployee(data: any): Promise<Employee> {
     const requestDto = new CreateEmployeeRequestDto(data);
 
     const validation = requestDto.validate();
@@ -24,7 +25,7 @@ class EmployeeService {
       throw new Error(validation.errors.join(', '));
     }
 
-    const existingEmployee = await employeeRepository.findByEmail(requestDto.email);
+    const existingEmployee = await employeeRepository.findByEmail(requestDto.email!);
     if (existingEmployee) {
       throw new Error('Employee with this email already exists');
     }
@@ -32,7 +33,7 @@ class EmployeeService {
     return await employeeRepository.create(requestDto);
   }
 
-  async updateEmployee(id, data) {
+  async updateEmployee(id: number | string, data: any): Promise<Employee> {
     const employee = await employeeRepository.findById(id);
 
     if (!employee) {
@@ -60,7 +61,7 @@ class EmployeeService {
     return await employeeRepository.update(id, requestDto);
   }
 
-  async deleteEmployee(id) {
+  async deleteEmployee(id: number | string): Promise<Employee> {
     const employee = await employeeRepository.findById(id);
 
     if (!employee) {
@@ -70,7 +71,7 @@ class EmployeeService {
     return await employeeRepository.delete(id);
   }
 
-  async getEmployeesByDepartment(department) {
+  async getEmployeesByDepartment(department: string): Promise<Employee[]> {
     if (!department) {
       throw new Error('Department is required');
     }
@@ -79,4 +80,4 @@ class EmployeeService {
   }
 }
 
-module.exports = new EmployeeService();
+export default new EmployeeService();

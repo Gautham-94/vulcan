@@ -7,6 +7,7 @@ This document provides context for Claude Code (or any AI assistant) to understa
 ## Project Overview
 
 **Project Type:** Node.js REST API with layered architecture
+**Language:** TypeScript
 **Framework:** Express.js
 **Database:** PostgreSQL (via Docker)
 **ORM:** Prisma 7.x
@@ -48,32 +49,37 @@ Each layer/file has ONE clear responsibility:
 ```
 src/
 ├── routes/              # Route definitions
-│   └── *.routes.js      # Naming: entity.routes.js
+│   └── *.routes.ts      # Naming: entity.routes.ts
 ├── controllers/         # HTTP request handlers
-│   └── *.controller.js  # Naming: entity.controller.js
+│   └── *.controller.ts  # Naming: entity.controller.ts
 ├── dto/                 # Data Transfer Objects
 │   ├── request/         # Input validation & sanitization
-│   │   └── *.request.dto.js
+│   │   └── *.request.dto.ts
 │   ├── response/        # Output formatting & data exposure control
-│   │   └── *.response.dto.js
+│   │   └── *.response.dto.ts
 │   └── mapper/          # DTO ↔ Model conversion
-│       └── *.mapper.js
+│       └── *.mapper.ts
 ├── services/            # Business logic layer
-│   └── *.service.js     # Naming: entity.service.js
+│   └── *.service.ts     # Naming: entity.service.ts
 ├── repositories/        # Data access layer
-│   └── *.repository.js  # Naming: entity.repository.js
+│   └── *.repository.ts  # Naming: entity.repository.ts
 ├── models/              # Domain models (future use for rich domain logic)
-│   └── *.js
+│   └── *.ts
 ├── middleware/          # Express middleware
+├── types/               # TypeScript types and interfaces
+│   └── common.types.ts  # Common type definitions
 ├── config/              # Configuration files
-│   ├── database.js      # Prisma client setup
-│   └── swagger.js       # API documentation config
-├── app.js               # Express app setup
-└── server.js            # Server entry point
+│   ├── database.ts      # Prisma client setup
+│   └── swagger.ts       # API documentation config
+├── app.ts               # Express app setup
+└── server.ts            # Server entry point
 
 prisma/
 ├── schema.prisma        # Database schema
 └── migrations/          # Database migrations (auto-generated)
+
+dist/                    # Compiled JavaScript (generated, not committed)
+tsconfig.json            # TypeScript configuration
 ```
 
 ---
@@ -118,51 +124,64 @@ npm run db:migrate
 
 ### Step 2: Create Repository Layer
 
-**File:** `src/repositories/entity.repository.js`
+**File:** `src/repositories/entity.repository.ts`
 
 **Template:**
-```javascript
-const prisma = require('../config/database');
+```typescript
+import { Entity, Prisma } from '@prisma/client';
+import prisma from '../config/database';
+import { CreateEntityRequestDto, UpdateEntityRequestDto } from '../dto/request/entity.request.dto';
 
 class EntityRepository {
-  async findAll() {
+  async findAll(): Promise<Entity[]> {
     return await prisma.entity.findMany({
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findById(id) {
+  async findById(id: number | string): Promise<Entity | null> {
     return await prisma.entity.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id.toString()) },
     });
   }
 
-  async create(data) {
-    return await prisma.entity.create({ data });
+  async create(data: CreateEntityRequestDto): Promise<Entity> {
+    return await prisma.entity.create({
+      data: {
+        field1: data.field1!,
+        field2: data.field2!,
+        // Map all required fields
+      }
+    });
   }
 
-  async update(id, data) {
+  async update(id: number | string, data: UpdateEntityRequestDto): Promise<Entity> {
+    const updateData: Prisma.EntityUpdateInput = {};
+
+    if (data.field1 !== undefined) updateData.field1 = data.field1;
+    if (data.field2 !== undefined) updateData.field2 = data.field2;
+
     return await prisma.entity.update({
-      where: { id: parseInt(id) },
-      data,
+      where: { id: parseInt(id.toString()) },
+      data: updateData,
     });
   }
 
-  async delete(id) {
+  async delete(id: number | string): Promise<Entity> {
     return await prisma.entity.delete({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id.toString()) },
     });
   }
 
   // Add custom query methods as needed
-  async findByField(fieldValue) {
+  async findByField(fieldValue: string): Promise<Entity[]> {
     return await prisma.entity.findMany({
       where: { field: fieldValue },
     });
   }
 }
 
-module.exports = new EntityRepository();
+export default new EntityRepository();
 ```
 
 **Repository Rules:**
@@ -180,20 +199,39 @@ module.exports = new EntityRepository();
 
 #### 3a. Request DTOs
 
-**File:** `src/dto/request/entity.request.dto.js`
+**File:** `src/dto/request/entity.request.dto.ts`
 
 **Template:**
-```javascript
-class CreateEntityRequestDto {
-  constructor(data) {
+```typescript
+import { IRequestDto, IUpdateDto, ValidationResult } from '../../types/common.types';
+
+/**
+ * Interface for creating entity data
+ */
+interface CreateEntityData {
+  field1?: string;
+  field2?: string;
+  field3?: number;
+}
+
+/**
+ * CreateEntityRequestDto - Used for creating new entities
+ * Contains validation logic and data sanitization
+ */
+export class CreateEntityRequestDto implements IRequestDto {
+  field1?: string;
+  field2?: string;
+  field3?: number;
+
+  constructor(data: CreateEntityData) {
     // Sanitize and assign
     this.field1 = data.field1?.trim();
     this.field2 = data.field2?.trim().toLowerCase();
     this.field3 = data.field3;
   }
 
-  validate() {
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: string[] = [];
 
     if (!this.field1) {
       errors.push('Field1 is required');
@@ -209,21 +247,30 @@ class CreateEntityRequestDto {
     };
   }
 
-  isValidFormat(value) {
+  private isValidFormat(value: string): boolean {
     // Validation logic
     return true;
   }
 }
 
-class UpdateEntityRequestDto {
-  constructor(data) {
+/**
+ * UpdateEntityRequestDto - Used for updating existing entities
+ * All fields are optional
+ */
+export class UpdateEntityRequestDto implements IUpdateDto {
+  field1?: string;
+  field2?: string;
+  field3?: number;
+
+  constructor(data: CreateEntityData) {
     // All fields optional
     if (data.field1 !== undefined) this.field1 = data.field1?.trim();
     if (data.field2 !== undefined) this.field2 = data.field2?.trim();
+    if (data.field3 !== undefined) this.field3 = data.field3;
   }
 
-  validate() {
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: string[] = [];
     // Validate provided fields
     return {
       isValid: errors.length === 0,
@@ -231,15 +278,10 @@ class UpdateEntityRequestDto {
     };
   }
 
-  isEmpty() {
+  isEmpty(): boolean {
     return Object.keys(this).length === 0;
   }
 }
-
-module.exports = {
-  CreateEntityRequestDto,
-  UpdateEntityRequestDto,
-};
 ```
 
 **Request DTO Rules:**
@@ -252,13 +294,22 @@ module.exports = {
 
 #### 3b. Response DTOs
 
-**File:** `src/dto/response/entity.response.dto.js`
+**File:** `src/dto/response/entity.response.dto.ts`
 
 **Template:**
-```javascript
-// Basic response - excludes sensitive data
-class EntityResponseDto {
-  constructor(entity) {
+```typescript
+import { Entity } from '@prisma/client';
+
+/**
+ * EntityResponseDto - Used for returning entity data to clients
+ * This DTO excludes internal fields and formats data appropriately
+ */
+export class EntityResponseDto {
+  name: string;
+  field1: string;
+  field2: string;
+
+  constructor(entity: Entity) {
     this.name = entity.name;
     this.field1 = entity.field1;
     this.field2 = entity.field2;
@@ -266,9 +317,18 @@ class EntityResponseDto {
   }
 }
 
-// Detailed response - includes all data
-class EntityDetailResponseDto {
-  constructor(entity) {
+/**
+ * EntityDetailResponseDto - Used when returning detailed entity info (includes ID)
+ */
+export class EntityDetailResponseDto {
+  id: number;
+  name: string;
+  field1: string;
+  field2: string;
+  createdAt: Date;
+  updatedAt: Date;
+
+  constructor(entity: Entity) {
     this.id = entity.id;
     this.name = entity.name;
     this.field1 = entity.field1;
@@ -278,21 +338,21 @@ class EntityDetailResponseDto {
   }
 }
 
-// List response - minimal data for lists
-class EntityListResponseDto {
-  constructor(entity) {
+/**
+ * EntityListResponseDto - Minimal response for list views (excludes sensitive data)
+ */
+export class EntityListResponseDto {
+  id: number;
+  name: string;
+  field1: string;
+
+  constructor(entity: Entity) {
     this.id = entity.id;
     this.name = entity.name;
     this.field1 = entity.field1;
     // Exclude: heavy fields, sensitive data
   }
 }
-
-module.exports = {
-  EntityResponseDto,
-  EntityDetailResponseDto,
-  EntityListResponseDto,
-};
 ```
 
 **Response DTO Rules:**
@@ -305,49 +365,58 @@ module.exports = {
 
 #### 3c. Mapper
 
-**File:** `src/dto/mapper/entity.mapper.js`
+**File:** `src/dto/mapper/entity.mapper.ts`
 
 **Template:**
-```javascript
-const {
+```typescript
+import { Entity } from '@prisma/client';
+import {
   EntityResponseDto,
   EntityDetailResponseDto,
   EntityListResponseDto,
-} = require('../response/entity.response.dto');
+} from '../response/entity.response.dto';
 
-class EntityMapper {
-  static toResponseDto(entity) {
+/**
+ * EntityMapper - Utility class for mapping between domain models and DTOs
+ * Follows the Single Responsibility Principle
+ */
+export class EntityMapper {
+  static toResponseDto(entity: Entity | null): EntityResponseDto | null {
     if (!entity) return null;
     return new EntityResponseDto(entity);
   }
 
-  static toDetailResponseDto(entity) {
+  static toDetailResponseDto(entity: Entity | null): EntityDetailResponseDto | null {
     if (!entity) return null;
     return new EntityDetailResponseDto(entity);
   }
 
-  static toListResponseDto(entity) {
+  static toListResponseDto(entity: Entity | null): EntityListResponseDto | null {
     if (!entity) return null;
     return new EntityListResponseDto(entity);
   }
 
-  static toResponseDtoArray(entities) {
+  static toResponseDtoArray(entities: Entity[]): EntityResponseDto[] {
     if (!Array.isArray(entities)) return [];
-    return entities.map((entity) => this.toResponseDto(entity));
+    return entities
+      .map((entity) => this.toResponseDto(entity))
+      .filter((dto): dto is EntityResponseDto => dto !== null);
   }
 
-  static toDetailResponseDtoArray(entities) {
+  static toDetailResponseDtoArray(entities: Entity[]): EntityDetailResponseDto[] {
     if (!Array.isArray(entities)) return [];
-    return entities.map((entity) => this.toDetailResponseDto(entity));
+    return entities
+      .map((entity) => this.toDetailResponseDto(entity))
+      .filter((dto): dto is EntityDetailResponseDto => dto !== null);
   }
 
-  static toListResponseDtoArray(entities) {
+  static toListResponseDtoArray(entities: Entity[]): EntityListResponseDto[] {
     if (!Array.isArray(entities)) return [];
-    return entities.map((entity) => this.toListResponseDto(entity));
+    return entities
+      .map((entity) => this.toListResponseDto(entity))
+      .filter((dto): dto is EntityListResponseDto => dto !== null);
   }
 }
-
-module.exports = EntityMapper;
 ```
 
 **Mapper Rules:**

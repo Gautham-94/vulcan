@@ -1,19 +1,40 @@
+import { IRequestDto, IUpdateDto, ValidationResult } from '../../types/common.types';
+
+/**
+ * Interface for creating employee data
+ */
+interface CreateEmployeeData {
+  name?: string;
+  email?: string;
+  position?: string;
+  department?: string;
+  salary?: number | string;
+  hireDate?: string | Date;
+}
+
 /**
  * CreateEmployeeRequestDto - Used for creating new employees
  * Contains validation logic and data sanitization
  */
-class CreateEmployeeRequestDto {
-  constructor(data) {
+export class CreateEmployeeRequestDto implements IRequestDto {
+  name?: string;
+  email?: string;
+  position?: string;
+  department?: string;
+  salary?: number;
+  hireDate?: Date;
+
+  constructor(data: CreateEmployeeData) {
     this.name = data.name?.trim();
     this.email = data.email?.trim().toLowerCase();
     this.position = data.position?.trim();
     this.department = data.department?.trim();
-    this.salary = data.salary;
-    this.hireDate = data.hireDate;
+    this.salary = typeof data.salary === 'string' ? parseFloat(data.salary) : data.salary;
+    this.hireDate = data.hireDate ? new Date(data.hireDate) : undefined;
   }
 
-  validate() {
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: string[] = [];
 
     if (!this.name) {
       errors.push('Name is required');
@@ -41,7 +62,7 @@ class CreateEmployeeRequestDto {
 
     if (!this.hireDate) {
       errors.push('Hire date is required');
-    } else if (isNaN(Date.parse(this.hireDate))) {
+    } else if (isNaN(this.hireDate.getTime())) {
       errors.push('Invalid hire date format');
     }
 
@@ -51,7 +72,7 @@ class CreateEmployeeRequestDto {
     };
   }
 
-  isValidEmail(email) {
+  private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
@@ -61,20 +82,31 @@ class CreateEmployeeRequestDto {
  * UpdateEmployeeRequestDto - Used for updating existing employees
  * All fields are optional
  */
-class UpdateEmployeeRequestDto {
-  constructor(data) {
+export class UpdateEmployeeRequestDto implements IUpdateDto {
+  name?: string;
+  email?: string;
+  position?: string;
+  department?: string;
+  salary?: number;
+  hireDate?: Date;
+
+  constructor(data: CreateEmployeeData) {
     if (data.name !== undefined) this.name = data.name?.trim();
     if (data.email !== undefined) this.email = data.email?.trim().toLowerCase();
     if (data.position !== undefined) this.position = data.position?.trim();
     if (data.department !== undefined) this.department = data.department?.trim();
-    if (data.salary !== undefined) this.salary = data.salary;
-    if (data.hireDate !== undefined) this.hireDate = data.hireDate;
+    if (data.salary !== undefined) {
+      this.salary = typeof data.salary === 'string' ? parseFloat(data.salary) : data.salary;
+    }
+    if (data.hireDate !== undefined) {
+      this.hireDate = new Date(data.hireDate);
+    }
   }
 
-  validate() {
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: string[] = [];
 
-    if (this.email !== undefined && !this.isValidEmail(this.email)) {
+    if (this.email !== undefined && this.email && !this.isValidEmail(this.email)) {
       errors.push('Invalid email format');
     }
 
@@ -82,7 +114,7 @@ class UpdateEmployeeRequestDto {
       errors.push('Salary must be a positive number');
     }
 
-    if (this.hireDate !== undefined && isNaN(Date.parse(this.hireDate))) {
+    if (this.hireDate !== undefined && isNaN(this.hireDate.getTime())) {
       errors.push('Invalid hire date format');
     }
 
@@ -92,17 +124,12 @@ class UpdateEmployeeRequestDto {
     };
   }
 
-  isValidEmail(email) {
+  private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
 
-  isEmpty() {
+  isEmpty(): boolean {
     return Object.keys(this).length === 0;
   }
 }
-
-module.exports = {
-  CreateEmployeeRequestDto,
-  UpdateEmployeeRequestDto,
-};
