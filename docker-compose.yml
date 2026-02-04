@@ -1,0 +1,15 @@
+version: "3.1"
+services:
+  postgres-vulcan: #name of db service, what u see as docker service name
+    image: postgres:latest
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: vulcan #name of your database change it
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
